@@ -12,14 +12,13 @@ interface Vehicle {
   parkingName: string;
   entryDateTime: string;
   exitDateTime: string | null;
-  chargedAmount: number;
+  chargedAmount: number | null;
 }
 
 interface ReportSummary {
   totalVehicles: number;
   totalRevenue: number;
 }
-
 
 const Reports: React.FC = () => {
   const { user } = useUser();
@@ -42,43 +41,66 @@ const Reports: React.FC = () => {
       const response = await authorizedAPI.get(`/reports/${reportType}`, {
         params: {
           startDate,
-          endDate
-        }
+          endDate,
+        },
       });
-      
-      
-      setVehicles(response.data.data.vehicles);
-      setSummary(response.data.data.summary);
+
+      const fetchedVehicles: Vehicle[] = response.data.data || [];
+
+      if (fetchedVehicles.length === 0) {
+        toast.error('No reports for the selected date range');
+        setVehicles([]);
+        setSummary(null);
+        setReportGenerated(false); // Prevent rendering empty report
+        return;
+      }
+
+      // Compute summary locally
+      const totalVehicles = fetchedVehicles.length;
+      const totalRevenue = fetchedVehicles
+        .filter(v => v.chargedAmount !== null)
+        .reduce((sum, v) => sum + (v.chargedAmount || 0), 0);
+
+      setVehicles(fetchedVehicles);
+      setSummary({ totalVehicles, totalRevenue });
       setReportGenerated(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating report:', error);
-      toast.error('Failed to generate report');
+      toast.error(error.response?.data?.message || 'Failed to generate report');
+      setVehicles([]);
+      setSummary(null);
+      setReportGenerated(false);
     } finally {
       setLoading(false);
     }
   };
 
   const exportToCsv = () => {
-    if (!vehicles.length) return;
+    if (!vehicles.length) {
+      toast.error('No data to export');
+      return;
+    }
 
     const headers = ['Plate Number', 'Parking', 'Entry Time', 'Exit Time', 'Duration', 'Amount'];
-    
+
     const csvRows = [
       headers.join(','),
       ...vehicles.map(vehicle => {
         const entryTime = new Date(vehicle.entryDateTime);
         const exitTime = vehicle.exitDateTime ? new Date(vehicle.exitDateTime) : null;
-        const duration = exitTime ? ((exitTime.getTime() - entryTime.getTime()) / (1000 * 60 * 60)).toFixed(2) + ' hours' : '-';
-        
+        const duration = exitTime
+          ? ((exitTime.getTime() - entryTime.getTime()) / (1000 * 60 * 60)).toFixed(2) + ' hours'
+          : '-';
+
         return [
           vehicle.plateNumber,
           vehicle.parkingName,
           format(entryTime, 'yyyy-MM-dd HH:mm:ss'),
           exitTime ? format(exitTime, 'yyyy-MM-dd HH:mm:ss') : '-',
           duration,
-          vehicle.chargedAmount ? `$${vehicle.chargedAmount.toFixed(2)}` : '-'
+          vehicle.chargedAmount !== null ? `$${vehicle.chargedAmount.toFixed(2)}` : '-',
         ].join(',');
-      })
+      }),
     ];
 
     const csvContent = csvRows.join('\n');
@@ -93,7 +115,7 @@ const Reports: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
         <p className="text-gray-600">Generate and view parking reports</p>
@@ -103,7 +125,9 @@ const Reports: React.FC = () => {
         <h2 className="text-lg font-semibold mb-4">Generate Report</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label htmlFor="reportType" className="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
+            <label htmlFor="reportType" className="block text-sm font-medium text-gray-700 mb-1">
+              Report Type
+            </label>
             <select
               id="reportType"
               value={reportType}
@@ -114,9 +138,11 @@ const Reports: React.FC = () => {
               <option value="exits">Vehicle Exits (with Revenue)</option>
             </select>
           </div>
-          
+
           <div>
-            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
             <input
               type="date"
               id="startDate"
@@ -126,9 +152,11 @@ const Reports: React.FC = () => {
               required
             />
           </div>
-          
+
           <div>
-            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
             <input
               type="date"
               id="endDate"
@@ -138,7 +166,7 @@ const Reports: React.FC = () => {
               required
             />
           </div>
-          
+
           <div className="flex items-end">
             <button
               onClick={generateReport}
@@ -161,7 +189,7 @@ const Reports: React.FC = () => {
         </div>
       </div>
 
-      {reportGenerated && (
+      {reportGenerated && vehicles.length > 0 && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="bg-white rounded-lg shadow p-6">
@@ -196,10 +224,7 @@ const Reports: React.FC = () => {
               <h2 className="font-bold text-lg">
                 {reportType === 'entries' ? 'Vehicle Entries' : 'Vehicle Exits'} Report
               </h2>
-              <button
-                onClick={exportToCsv}
-                className="flex items-center text-blue-600 hover:text-blue-800"
-              >
+              <button onClick={exportToCsv} className="flex items-center text-blue-600 hover:text-blue-800">
                 <Download size={18} className="mr-1" />
                 Export CSV
               </button>
@@ -208,14 +233,26 @@ const Reports: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plate Number</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parking</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entry Time</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Plate Number
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Parking
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Entry Time
+                    </th>
                     {reportType === 'exits' && (
                       <>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exit Time</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Exit Time
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Duration
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
                       </>
                     )}
                   </tr>
@@ -225,13 +262,15 @@ const Reports: React.FC = () => {
                     vehicles.map((vehicle) => {
                       const entryTime = new Date(vehicle.entryDateTime);
                       const exitTime = vehicle.exitDateTime ? new Date(vehicle.exitDateTime) : null;
-                      const duration = exitTime 
+                      const duration = exitTime
                         ? ((exitTime.getTime() - entryTime.getTime()) / (1000 * 60 * 60)).toFixed(2) + ' hours'
                         : '-';
-                      
+
                       return (
                         <tr key={vehicle.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{vehicle.plateNumber}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {vehicle.plateNumber}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{vehicle.parkingName}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {format(entryTime, 'PPpp')}
@@ -241,11 +280,9 @@ const Reports: React.FC = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {exitTime ? format(exitTime, 'PPpp') : '-'}
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{duration}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {duration}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                ${vehicle.chargedAmount.toFixed(2)}
+                                {vehicle.chargedAmount !== null ? `$${vehicle.chargedAmount.toFixed(2)}` : '-'}
                               </td>
                             </>
                           )}
@@ -254,7 +291,10 @@ const Reports: React.FC = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={reportType === 'exits' ? 6 : 3} className="px-6 py-4 text-center text-sm text-gray-500">
+                      <td
+                        colSpan={reportType === 'exits' ? 6 : 3}
+                        className="px-6 py-4 text-center text-sm text-gray-500"
+                      >
                         No data found for the selected period
                       </td>
                     </tr>
