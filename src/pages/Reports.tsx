@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useUser } from '../context/UserContext';
 import { BarChart3, Download, Car, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
+import { authorizedAPI } from '../constants/api';
 
 interface Vehicle {
   id: string;
@@ -20,7 +20,6 @@ interface ReportSummary {
   totalRevenue: number;
 }
 
-const API_URL = 'http://localhost:5000/api';
 
 const Reports: React.FC = () => {
   const { user } = useUser();
@@ -40,15 +39,16 @@ const Reports: React.FC = () => {
 
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/reports/${reportType}`, {
+      const response = await authorizedAPI.get(`/reports/${reportType}`, {
         params: {
           startDate,
           endDate
         }
       });
       
-      setVehicles(response.data.vehicles);
-      setSummary(response.data.summary);
+      
+      setVehicles(response.data.data.vehicles);
+      setSummary(response.data.data.summary);
       setReportGenerated(true);
     } catch (error) {
       console.error('Error generating report:', error);
