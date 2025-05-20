@@ -21,7 +21,7 @@ interface VehicleEntry {
   parkingName: string;
   entryDateTime: string;
   exitDateTime: string | null;
-  chargedAmount: number | null;
+ hourlyFee: number | null;
 }
 
 interface Parking {
@@ -240,7 +240,7 @@ const Dashboard: React.FC = () => {
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {entry.chargedAmount ? `$${entry.chargedAmount.toFixed(2)}` : '-'}
+                              {entry.hourlyFee ? `$${entry.hourlyFee.toFixed(2)}` : '-'}
                             </td>
                           </tr>
                         ))

@@ -21,7 +21,7 @@ interface Vehicle {
   parkingName: string;
   entryDateTime: string;
   exitDateTime: string | null;
-  chargedAmount: number;
+  hourlyFee: number;
 }
 
 interface VehicleEntryFormData {
@@ -113,6 +113,36 @@ const VehicleManagement: React.FC = () => {
     });
     setShowEntryForm(false);
   };
+
+
+ function calculateParkingFee(
+  hourlyFee: number,
+  entryDateTime: string | Date,
+  exitDateTime?: string | Date | null
+): number {
+  // Handle invalid inputs
+  if (!hourlyFee || hourlyFee <= 0 || !entryDateTime) {
+    return 0;
+  }
+
+  // Convert to Date objects
+  const entry = new Date(entryDateTime);
+  const exit = exitDateTime ? new Date(exitDateTime) : new Date();
+
+  // Validate dates
+  if (isNaN(entry.getTime()) || isNaN(exit.getTime()) || exit < entry) {
+    return 0;
+  }
+
+  // Calculate duration in minutes
+  const durationMinutes = (exit.getTime() - entry.getTime()) / (1000 * 60);
+
+  // Round up to the nearest hour (e.g., 5 mins → 1 hour, 61 mins → 2 hours)
+  const hoursCharged = Math.ceil(durationMinutes / 60);
+
+  // Calculate fee
+  return hoursCharged * hourlyFee;
+}
 
   const printTicket = () => {
     const printWindow = window.open('', '_blank');
@@ -235,7 +265,7 @@ const VehicleManagement: React.FC = () => {
                 </table>
               </div>
               <div class="amount">
-                TOTAL: $${selectedVehicle.chargedAmount.toFixed(2)}
+                TOTAL: $${selectedVehicle.hourlyFee}
               </div>
               <div class="footer">
                 <p>Thank you for choosing XWYZ Parking!</p>
@@ -406,7 +436,7 @@ const VehicleManagement: React.FC = () => {
                 )}</div>
                 
                 <div className="text-gray-600 font-bold">Total Amount:</div>
-                <div className="font-bold">${selectedVehicle.chargedAmount.toFixed(2)}</div>
+                <div className="font-bold">${calculateParkingFee(selectedVehicle.hourlyFee , selectedVehicle.entryDateTime, selectedVehicle.exitDateTime)}</div>
               </div>
             </div>
             <div className="flex justify-end space-x-3">
@@ -466,7 +496,7 @@ const VehicleManagement: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {vehicle.chargedAmount ? `$${vehicle.chargedAmount.toFixed(2)}` : '-'}
+                      {vehicle.hourlyFee ? `$${vehicle.hourlyFee}` : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {!vehicle.exitDateTime ? (
