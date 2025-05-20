@@ -51,8 +51,8 @@ const VehicleManagement: React.FC = () => {
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-      const response = await authorizedAPI.get(`/vehicles`);
-      setVehicles(response.data);
+      const response = await authorizedAPI.get(`/entries`);
+      setVehicles(response.data.data);
     } catch (error) {
       console.error('Error fetching vehicles:', error);
       toast.error('Failed to load vehicle data');
@@ -63,8 +63,8 @@ const VehicleManagement: React.FC = () => {
 
   const fetchParkings = async () => {
     try {
-      const response = await authorizedAPI.get(`$/parkings`);
-      setParkings(response.data);
+      const response = await authorizedAPI.get(`/parkings`);      
+      setParkings(response.data.data);
     } catch (error) {
       console.error('Error fetching parkings:', error);
     }
@@ -79,7 +79,7 @@ const VehicleManagement: React.FC = () => {
     e.preventDefault();
     
     try {
-      const response = await authorizedAPI.post(`/vehicles/entry`, formData);
+      const response = await authorizedAPI.post(`/entries`, formData);
       toast.success('Vehicle entry recorded successfully');
       setSelectedVehicle(response.data);
       setShowTicket(true);
@@ -94,7 +94,7 @@ const VehicleManagement: React.FC = () => {
 
   const handleExit = async (id: string) => {
     try {
-      const response = await authorizedAPI.put(`/vehicles/exit/${id}`);
+      const response = await authorizedAPI.put(`/entries/${id}/exit`);
       toast.success('Vehicle exit recorded successfully');
       setSelectedVehicle(response.data);
       setShowBill(true);
